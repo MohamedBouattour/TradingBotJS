@@ -1,0 +1,16 @@
+{
+  "name": "jsbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "indicatorts": "^1.0.4",
+    "node-binance-api": "^0.13.1"
+  }
+}
