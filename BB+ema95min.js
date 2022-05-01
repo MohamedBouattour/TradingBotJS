@@ -7,7 +7,7 @@ const binance = new Binance().options({
   APIKEY: process.APIKEY,
   APISECRET: process.APISECRET,
 });
-const PAIR = "BTCUSDT";
+const PAIR = "PAXGUSDT";
 async function start() {
   // Intervals: 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M
   binance.candlesticks(
@@ -53,29 +53,33 @@ async function start() {
         .map(Number);
       const emas = ema(9, closes);
       const bbs = bollingerBands(closes);
-      //console.log(Math.abs(Number(ticks[n - 1][1]) - Number(ticks[n - 1][4])))
       let targetPrice = 0;
       let entred = false;
       let entryPrice;
       let slPrice;
       let rio = 1;
       let positions = 0;
+      let gains = 0
+      let losses = 0
       let periods = [];
+      let arbitrage
       for (let i = 3; i < n; i++) {
         if (!entred) {
           if (
             Number(ticks[i][4]) > bbs["upperBand"][i] ||
             Number(ticks[i][4]) < bbs["lowerBand"][i]
           ) {
-            entryPrice = ticks[i][4];
+            entryPrice = Number(ticks[i][4]);
             targetPrice = emas[i];
             if (
               Number(ticks[i][4]) > bbs["upperBand"][i] &&
               Number(ticks[i - 1][4]) < bbs["upperBand"][i - 1] &&
               Number(ticks[i - 2][4]) < bbs["upperBand"][i - 2]
             ) {
-              console.log("SHORT@: " + ticks[i][4]);
-              slPrice = Number(ticks[i][2]);
+              //targetPrice = entryPrice * (1-0.002)
+              arbitrage = (entryPrice/targetPrice)-1
+              console.log("SHORT@: " + entryPrice);
+              slPrice = entryPrice*(1+(arbitrage/2))
               entred = true;
               periods.push({
                 start: new Date(ticks[i][0]).toUTCString(),
@@ -84,6 +88,7 @@ async function start() {
                 targetPrice,
                 slPrice,
                 type: "SHORT",
+                arbitrage
               });
             }
             if (
@@ -91,8 +96,10 @@ async function start() {
               Number(ticks[i - 1][4]) > bbs["lowerBand"][i - 1] &&
               Number(ticks[i - 2][4]) > bbs["lowerBand"][i - 2]
             ) {
-              console.log("LONG@: " + ticks[i][4]);
-              slPrice = Number(ticks[i][3]);
+              //targetPrice = entryPrice * (1+0.002)
+              arbitrage = (targetPrice/entryPrice)-1
+              console.log("LONG@: " + entryPrice);
+              slPrice = entryPrice*(1-(arbitrage/2))
               entred = true;
               periods.push({
                 start: new Date(ticks[i][0]).toUTCString(),
@@ -101,11 +108,13 @@ async function start() {
                 targetPrice,
                 slPrice,
                 type: "LONG",
+                arbitrage
               });
             }
           }
         } else {
           if (targetPrice > lows[i] && targetPrice < highs[i]) {
+            gains++
             console.log("TP@: " + targetPrice);
             rio =
               rio *
@@ -123,6 +132,7 @@ async function start() {
               ratio:Math.max(targetPrice / entryPrice, entryPrice / targetPrice)
             };
           } else if (slPrice > lows[i] && slPrice < highs[i]) {
+          losses++
           console.log("SL@: " + slPrice);
           rio = rio * Math.min(slPrice / entryPrice, entryPrice / slPrice);
           entred = false;
@@ -141,11 +151,13 @@ async function start() {
         }
       }
       console.log(periods);
-      console.log("RIO " + rio + " in " + positions + " Trades");
-      console.log(ticks[0][0]); 
+      console.log("Balance " + rio*100 + " in " + positions + " Trades");
+      positions > 0 && console.log("Win " + gains + " Lose " + losses + " Winrate", (gains/(gains+losses))*100+"%");
+      //console.log(ticks[0][0]); 
     },
-    //{ endTime: 1650765900000 }
+    //{ endTime }
   );
 }
+
 
 start();
