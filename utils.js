@@ -1,5 +1,4 @@
-const { ema } = require("indicatorts");
-
+const { ema, bollingerBands } = require("indicatorts");
 function delay(ms) {
   return new Promise((res) => setTimeout(res, ms));
 }
@@ -39,7 +38,7 @@ function backtestBBema95min(ticks) {
   let losses = 0
   let periods = [];
   let arbitrage
-  for (let i = 3; i < n; i++) {
+  for (let i = 3; i < ticks.length; i++) {
     if (!entred) {
       if (
         Number(ticks[i][4]) > bbs["upperBand"][i] ||
@@ -126,7 +125,7 @@ function backtestBBema95min(ticks) {
     }
     }
   }
-  console.log(periods);
+  console.log(periods.slice(-50));
   console.log("Balance " + rio*100 + " in " + positions + " Trades");
   positions > 0 && console.log("Win " + gains + " Lose " + losses + " Winrate", (gains/(gains+losses))*100+"%");
 }
