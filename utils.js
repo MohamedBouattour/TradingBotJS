@@ -14,7 +14,7 @@ function volumeOscillator(shortEMA, longEMA, volumes) {
   return oscillations
 }
 
-function backtestBBema95min(ticks) {
+function backtestBBema95min(ticks, period) {
   const closes = ticks
     .map((t) => t[4])
     .map(Number);
@@ -38,6 +38,7 @@ function backtestBBema95min(ticks) {
   let losses = 0
   let periods = [];
   let arbitrage
+  let winMarge = 1.0011
   for (let i = 3; i < ticks.length; i++) {
     if (!entred) {
       if (
@@ -49,7 +50,8 @@ function backtestBBema95min(ticks) {
         if (
           Number(ticks[i][4]) > bbs["upperBand"][i] &&
           Number(ticks[i - 1][4]) < bbs["upperBand"][i - 1] &&
-          Number(ticks[i - 2][4]) < bbs["upperBand"][i - 2]
+          Number(ticks[i - 2][4]) < bbs["upperBand"][i - 2] 
+          //(entryPrice/targetPrice) >= winMarge
         ) {
           //targetPrice = entryPrice * (1-0.002)
           arbitrage = (entryPrice/targetPrice)-1
@@ -69,7 +71,8 @@ function backtestBBema95min(ticks) {
         if (
           Number(ticks[i][4]) < bbs["lowerBand"][i] &&
           Number(ticks[i - 1][4]) > bbs["lowerBand"][i - 1] &&
-          Number(ticks[i - 2][4]) > bbs["lowerBand"][i - 2]
+          Number(ticks[i - 2][4]) > bbs["lowerBand"][i - 2] 
+          //(targetPrice/entryPrice) >= winMarge
         ) {
           //targetPrice = entryPrice * (1+0.002)
           arbitrage = (targetPrice/entryPrice)-1
@@ -93,7 +96,7 @@ function backtestBBema95min(ticks) {
         console.log("TP@: " + targetPrice);
         rio =
           rio *
-          Math.max(targetPrice / entryPrice, entryPrice / targetPrice);
+          (Math.max(targetPrice / entryPrice, entryPrice / targetPrice))-0.00075;
         entred = false;
         positions++;
         let old = periods[periods.length - 1];
@@ -109,7 +112,7 @@ function backtestBBema95min(ticks) {
       } else if (slPrice > lows[i] && slPrice < highs[i]) {
       losses++
       console.log("SL@: " + slPrice);
-      rio = rio * Math.min(slPrice / entryPrice, entryPrice / slPrice);
+      rio = rio * (Math.min(slPrice / entryPrice, entryPrice / slPrice))-0.00075;
       entred = false;
       positions++;
       let old = periods[periods.length - 1];
@@ -126,7 +129,7 @@ function backtestBBema95min(ticks) {
     }
   }
   console.log(periods.slice(-50));
-  console.log("Balance " + rio*100 + " in " + positions + " Trades");
+  console.log("Balance " + rio*100 + " in " + positions + " Trades in "+period+"Days");
   positions > 0 && console.log("Win " + gains + " Lose " + losses + " Winrate", (gains/(gains+losses))*100+"%");
 }
 module.exports = {
