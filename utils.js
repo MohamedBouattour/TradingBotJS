@@ -139,7 +139,7 @@ function backtestBBema95min(ticks, period) {
     );
 }
 
-function threeMA(ticks, period, shortMA = 7, meduimMA = 25, longMA = 99, margin = 1) {
+function threeMA(ticks, period, shortMA = 7, meduimMA = 25, longMA = 99, margin = 10) {
   const closes = ticks.map((t) => t[4]).map(Number);
   const highs = ticks.map((t) => t[2]).map(Number);
   const lows = ticks.map((t) => t[3]).map(Number);
@@ -237,21 +237,8 @@ function threeMA(ticks, period, shortMA = 7, meduimMA = 25, longMA = 99, margin 
           newBalance,
           pnl: newBalance - balance,
         };
-        if(Math.abs(newBalance - balance) > 10){
-          parasite.push({
-            ...old,
-            end: new Date(ticks[i][0]).toUTCString(),
-            diff:
-              (new Date(ticks[i][0]).getTime() - new Date(old.diff)) /
-              (1000 * 60 * 60),
-            hit: "TP",
-            ratio: Math.max(targetPrice / entryPrice, entryPrice / targetPrice),
-            newBalance,
-            pnl: newBalance - balance,
-          })
-        }
-        balance = newBalance;
-      } else if (slPrice > lows[i] && slPrice < highs[i]) {
+        balance = newBalance*0.99925;
+      }/*  else if (slPrice > lows[i] && slPrice < highs[i]) {
         losses++;
         console.log("SL@: " + slPrice);
         rio =
@@ -271,21 +258,8 @@ function threeMA(ticks, period, shortMA = 7, meduimMA = 25, longMA = 99, margin 
           newBalance,
           pnl: newBalance - balance,
         };
-        balance = newBalance;
-        if(Math.abs(newBalance - balance) > 10){
-          parasite.push({
-            ...old,
-            end: new Date(ticks[i][0]).toUTCString(),
-            diff:
-              (new Date(ticks[i][0]).getTime() - new Date(old.diff)) /
-              (1000 * 60 * 60),
-            hit: "SL",
-            ratio: Math.min(slPrice / entryPrice, entryPrice / slPrice),
-            newBalance,
-            pnl: newBalance - balance,
-          })
-        }
-      }
+        balance = newBalance*0.99925;
+      } */
     }
   }
   console.log(periods.slice(-15));
