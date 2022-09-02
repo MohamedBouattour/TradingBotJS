@@ -10,7 +10,7 @@ const binance = new Binance().options({
   APIKEY: process.APIKEY,
   APISECRET: process.APISECRET,
 });
-const PAIR = "PAXGUSDT";
+const PAIR = "BTCBUSD";
 
 let subject = new Subject();
 done$ = new Subject();
@@ -20,7 +20,7 @@ async function start(endTime = undefined) {
   // Intervals: 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M
   binance.candlesticks(
     PAIR,
-    "4h",
+    "15m",
     (error, ticks, symbol) => {
       if (!error){
         subject.next(ticks);
@@ -33,7 +33,7 @@ async function start(endTime = undefined) {
       else {
         console.error(error)
         lib.delay(1000)
-        start()
+        start(endTime)
       }
     },
     { endTime }
@@ -43,8 +43,8 @@ subject.pipe(takeUntil(done$)).subscribe((newData) => {
   data = [...newData, ...data];
   let period = (new Date() - new Date(data[0][0])) / (1000 * 60 * 60 * 24);
   console.log(period + "Days");
-  if (period > 100) {
-    lib.threeMA(data, period,undefined,undefined,undefined,1);
+  if (period > 1) {
+    lib.buyGoldSellD(data, period,9,25,1);
     done$.next(true);
     done$.unsubscribe();
   }
