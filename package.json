@@ -12,6 +12,7 @@
     "dotenv": "^16.0.0",
     "indicatorts": "^1.0.4",
     "node-binance-api": "^0.13.1",
-    "rxjs": "^7.5.5"
+    "rxjs": "^7.5.5",
+    "technicalindicators": "^3.1.0"
   }
 }

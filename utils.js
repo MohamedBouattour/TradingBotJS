@@ -1,4 +1,4 @@
-const { ema, bollingerBands } = require("indicatorts");
+const { ema, sma, bollingerBands } = require("indicatorts");
 function delay(ms) {
   return new Promise((res) => setTimeout(res, ms));
 }
@@ -412,10 +412,8 @@ function maCrossBB(
 /* 
   to be reworked for spot like trades buy hight sell low
 */
-function buyGoldSellD(ticks, period, shortMA = 9, longMA = 25, margin = 5) {
+function buyGoldSellD(ticks, shortMA = 9, longMA = 25, margin = 5) {
   const closes = ticks.map((t) => t[4]).map(Number);
-  const highs = ticks.map((t) => t[2]).map(Number);
-  const lows = ticks.map((t) => t[3]).map(Number);
   const fma = ema(shortMA, closes);
   const sma = ema(longMA, closes);
   let targetPrice = 0;
@@ -431,114 +429,138 @@ function buyGoldSellD(ticks, period, shortMA = 9, longMA = 25, margin = 5) {
   let balance = realBalance * margin;
   let winMarge = 1.0011;
   let parasite = [];
+  ratio = 0.03;
   for (let i = 1; i < ticks.length; i++) {
-    entryPrice = Number(ticks[i][4]);
-    if (fma[i - 1] >= sma[i - 1] && fma[i] < sma[i]) {
-      console.log("SHORT@: " + entryPrice);
-      gains++;
-      targetPrice = closes[i];
-      positions++;
-      if (entred) {
-        let old = periods[periods.length - 1];
-        let newBalance = balance * Math.max(targetPrice / old.entryPrice);
-        //old.entryPrice > entryPrice && console.log(old.entryPrice - entryPrice);
+    if (!entred) {
+      entryPrice = Number(ticks[i][4]);
+      if (fma[i - 1] < sma[i - 1] && fma[i] > sma[i]) {
+        console.log("Long@", entryPrice, new Date(ticks[i][0]));
+        periods.push({
+          info: `Long@-${entryPrice}-${new Date(ticks[i][0])}`,
+          entryPrice,
+          started: new Date(ticks[i][0]),
+          targetPrice: entryPrice * (1 + ratio),
+          slPrice: entryPrice * (1 - ratio / 2),
+        });
+        entred = true;
+      } else if (fma[i - 1] > sma[i - 1] && fma[i] < sma[i]) {
+        console.log("Short@", entryPrice, new Date(ticks[i][0]));
+        periods.push({
+          info: `Short@-${entryPrice}-${new Date(ticks[i][0])}`,
+          entryPrice,
+          started: new Date(ticks[i][0]),
+          targetPrice: entryPrice * (1 - ratio),
+          slPrice: entryPrice * (1 + ratio / 2),
+        });
+        entred = true;
+      }
+    } else {
+      const old = periods[periods.length - 1];
+      const targetPrice = old.targetPrice;
+      const stopLossPrice = old.slPrice;
+
+      if (
+        targetPrice < Number(ticks[i][2]) &&
+        targetPrice > Number(ticks[i][3])
+      ) {
         periods[periods.length - 1] = {
           ...old,
-          targetPrice,
-          end: new Date(ticks[i][0]).toUTCString(),
-          diff:
-            (new Date(ticks[i][0]).getTime() - new Date(old.diff)) /
-              (1000 * 60 * 60) +
-            "hours",
-          hit: "TP",
-          ratio: Math.max(targetPrice / entryPrice, entryPrice / targetPrice),
-          newBalance,
-          pnl: newBalance - balance,
+          TP: targetPrice,
+          time:
+            (new Date(ticks[i][0]).getTime() -
+              new Date(old.started).getTime()) /
+            (1000 * 60 * 60),
         };
-        balance = newBalance;
         entred = false;
-        realBalance = balance / margin
-      } else {
-        entred = true;
-        periods.push({
-          start: new Date(ticks[i][0]).toUTCString(),
-          diff: new Date(ticks[i][0]),
-          entryPrice,
-          type: "LONG",
-          entryFees: (balance / 100) * 0.027,
-        });
-      }
-    }
-    if (fma[i - 1] <= sma[i - 1] && fma[i] > sma[i]) {
-      console.log("LONG@: " + entryPrice);
-      targetPrice = closes[i];
-      if (entred) {
-        let old = periods[periods.length - 1];
-        let newBalance = balance * Math.max(targetPrice / old.entryPrice);
-        old.entryPrice > entryPrice && console.log(old.entryPrice - entryPrice);
+      } else if (
+        stopLossPrice < Number(ticks[i][2]) &&
+        stopLossPrice > Number(ticks[i][3])
+      ) {
         periods[periods.length - 1] = {
           ...old,
-          targetPrice,
-          end: new Date(ticks[i][0]).toUTCString(),
-          diff:
-            (new Date(ticks[i][0]).getTime() - new Date(old.diff)) /
-              (1000 * 60 * 60) +
-            "hours",
-          hit: "TP",
-          ratio: Math.max(targetPrice / entryPrice, entryPrice / targetPrice),
-          newBalance,
-          pnl: newBalance - balance,
+          SL: stopLossPrice,
+          time:
+            (new Date(ticks[i][0]).getTime() - new Date(old.started).getTime()) /
+            (1000 * 60 * 60),
         };
-        balance = newBalance;
-        realBalance = balance / margin
         entred = false;
-      } else {
-        entred = true;
-        periods.push({
-          start: new Date(ticks[i][0]).toUTCString(),
-          diff: new Date(ticks[i][0]),
-          entryPrice,
-          type: "LONG",
-          entryFees: (balance / 100) * 0.027,
-        });
       }
     }
-    calculate(
-      ticks,
-      i,
-      entryPrice,
-      targetPrice,
-      balance,
-      realBalance,
-      positions,
-      periods
-    );
   }
-  console.log(periods.splice(-5));
+  losses = periods.filter((pos) => pos.SL);
+  gains = periods.filter((pos) => pos.TP);
+  console.log(losses);
   console.log(
-    "Balance " +
-      realBalance +
-      "$ ----" +
-      " in " +
-      positions +
-      " Trades in " +
-      period +
-      "Days "
+    `${periods.length} positions ${gains.length}Wins & ${
+      losses.length
+    }Loss Winrate:${(gains.length * 100) / periods.length}%`
   );
-  if (positions > 0) {
-    console.log(
-      "Win " + gains + " Lose " + losses + " Winrate",
-      (gains / (gains + losses)) * 100 + "%"
-    );
-    /* let sortedPnl = periods
-      .map((pos) => pos.pnl)
-      .filter((item) => item && item.pnl)
-      .sort((a, b) => b - a);
-    console.log(
-      `highest win ${sortedPnl[0]} & ${sortedPnl[sortedPnl.length - 1]}`
-    ); */
-    //console.log('-------------------parasite-------------------')
-    //console.log(parasite)
+}
+
+function buyGoldSellDv2(ticks, period, shortMA = 9, longMA = 99, margin = 5) {
+  ticks.forEach((element, index) => {
+    /* const [
+      time,
+      open,
+      high,
+      low,
+      close,
+      volume,
+      closeTime,
+      assetVolume,
+      trades,
+      buyBaseVolume,
+      buyAssetVolume,
+      ignored,
+    ] = data; */
+    if (index >= longMA && index + longMA < 500) {
+      const closes = ticks
+        .slice()
+        .map((t) => Number(t[4]))
+        .slice(index, index + longMA);
+      detectMACrossover(closes, shortMA, longMA) &&
+        console.log(
+          new Date(ticks[index][0]),
+          detectMACrossover(
+            closes.slice(index, index + longMA),
+            shortMA,
+            longMA
+          )
+        );
+    }
+  });
+}
+
+function detectMACrossover(data, fastMA, slowMA) {
+  // data: array of historical price data
+  // fastMA: integer representing the period of the fast moving average
+  // slowMA: integer representing the period of the slow moving average
+
+  // calculate the simple moving averages
+  const fastSMA =
+    data.slice(-fastMA).reduce((acc, val) => acc + val, 0) / fastMA;
+  const slowSMA =
+    data.slice(-slowMA).reduce((acc, val) => acc + val, 0) / slowMA;
+
+  // check for a bullish crossover (fast MA crosses above slow MA)
+  if (
+    fastSMA > slowSMA &&
+    data.slice(-2)[0] <= slowSMA &&
+    data.slice(-1)[0] > fastSMA
+  ) {
+    return "Bullish crossover detected";
+  }
+  // check for a bearish crossover (fast MA crosses below slow MA)
+  else if (
+    fastSMA < slowSMA &&
+    data.slice(-2)[0] >= slowSMA &&
+    data.slice(-1)[0] < fastSMA
+  ) {
+    return "Bearish crossover detected";
+  }
+  // no crossover detected
+  else {
+    return null;
   }
 }
 module.exports = {
@@ -548,6 +570,7 @@ module.exports = {
   threeMA,
   maCrossBB,
   buyGoldSellD,
+  buyGoldSellDv2,
 };
 
 function calculate(

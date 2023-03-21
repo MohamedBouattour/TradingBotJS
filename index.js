@@ -1,5 +1,4 @@
 const Binance = require("node-binance-api");
-const { ema, bollingerBands } = require("indicatorts");
 const lib = require("./utils");
 require("dotenv").config();
 const { Subject, takeUntil } = require("rxjs");
@@ -10,7 +9,7 @@ const binance = new Binance().options({
   APIKEY: process.APIKEY,
   APISECRET: process.APISECRET,
 });
-const PAIR = "ETHBUSD";
+const PAIR = "BTCBUSD";
 
 let subject = new Subject();
 done$ = new Subject();
@@ -42,9 +41,9 @@ subject.pipe(takeUntil(done$)).subscribe((newData) => {
   data = [...newData, ...data];
   let period = (new Date() - new Date(data[0][0])) / (1000 * 60 * 60 * 24);
   console.log(period + "Days");
-  if (period > 1) {
+  if (period > 40) {
     //lib.maCrossBB(data, period, 9, 25, 1, 0.035);
-    lib.buyGoldSellD(data, period, 9, 25, 1);
+    lib.buyGoldSellD(data, 12, 26, 5);
     done$.next(true);
     done$.unsubscribe();
   }
