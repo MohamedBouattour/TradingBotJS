@@ -19,7 +19,7 @@ async function start(endTime = undefined) {
   // Intervals: 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M
   binance.candlesticks(
     PAIR,
-    "1h",
+    "15m",
     (error, ticks, symbol) => {
       if (!error) {
         subject.next(ticks);
@@ -41,9 +41,44 @@ subject.pipe(takeUntil(done$)).subscribe((newData) => {
   data = [...newData, ...data];
   let period = (new Date() - new Date(data[0][0])) / (1000 * 60 * 60 * 24);
   console.log(period + "Days");
-  if (period > 40) {
+  if (period > 1) {
     //lib.maCrossBB(data, period, 9, 25, 1, 0.035);
-    lib.buyGoldSellD(data, 12, 26, 5);
+    //lib.buyGoldSellDv2(data, 12, 26, 5);
+
+    lib.detectMACrossover(
+      data.map((item) => {
+        const data = ([
+          time,
+          open,
+          high,
+          low,
+          close,
+          volume,
+          closeTime,
+          assetVolume,
+          trades,
+          buyBaseVolume,
+          buyAssetVolume,
+          ignored,
+        ] = item);
+        return {
+          time,
+          open,
+          high,
+          low,
+          close,
+          volume,
+          closeTime,
+          assetVolume,
+          trades,
+          buyBaseVolume,
+          buyAssetVolume,
+          ignored,
+        };
+      }),
+      99,
+      25
+    );
     done$.next(true);
     done$.unsubscribe();
   }

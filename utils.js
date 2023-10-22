@@ -480,7 +480,8 @@ function buyGoldSellD(ticks, shortMA = 9, longMA = 25, margin = 5) {
           ...old,
           SL: stopLossPrice,
           time:
-            (new Date(ticks[i][0]).getTime() - new Date(old.started).getTime()) /
+            (new Date(ticks[i][0]).getTime() -
+              new Date(old.started).getTime()) /
             (1000 * 60 * 60),
         };
         entred = false;
@@ -532,36 +533,33 @@ function buyGoldSellDv2(ticks, period, shortMA = 9, longMA = 99, margin = 5) {
 }
 
 function detectMACrossover(data, fastMA, slowMA) {
-  // data: array of historical price data
-  // fastMA: integer representing the period of the fast moving average
-  // slowMA: integer representing the period of the slow moving average
+  const closes = data.map((t) => t.close).map(Number);
+  const fastSMA = ema(fastMA, closes);
+  const slowSMA = ema(slowMA, closes);
 
-  // calculate the simple moving averages
-  const fastSMA =
-    data.slice(-fastMA).reduce((acc, val) => acc + val, 0) / fastMA;
-  const slowSMA =
-    data.slice(-slowMA).reduce((acc, val) => acc + val, 0) / slowMA;
-
-  // check for a bullish crossover (fast MA crosses above slow MA)
-  if (
-    fastSMA > slowSMA &&
-    data.slice(-2)[0] <= slowSMA &&
-    data.slice(-1)[0] > fastSMA
-  ) {
-    return "Bullish crossover detected";
-  }
-  // check for a bearish crossover (fast MA crosses below slow MA)
-  else if (
-    fastSMA < slowSMA &&
-    data.slice(-2)[0] >= slowSMA &&
-    data.slice(-1)[0] < fastSMA
-  ) {
-    return "Bearish crossover detected";
-  }
-  // no crossover detected
-  else {
-    return null;
-  }
+  data.forEach((item, index) => {
+    if (index > 2) {
+      if (
+        fastSMA[index] > slowSMA[index] &&
+        fastSMA[index - 1] < slowSMA[index - 1] &&
+        fastSMA[index - 2] < slowSMA[index - 2]
+      ) {
+        console.log(
+          "Bullish crossover detected @" +
+            new Date(data[index].time).toUTCString()
+        );
+      }
+      else if (
+        fastSMA[index] < slowSMA[index] &&
+        fastSMA[index - 1] > slowSMA[index - 1] &&
+        fastSMA[index - 2] > slowSMA[index - 2]
+      ) {
+        console.log(
+          "Bearish crossover detected @" + new Date(data[index].time).toUTCString()
+        );
+      }
+    }
+  });
 }
 module.exports = {
   delay,
@@ -571,6 +569,7 @@ module.exports = {
   maCrossBB,
   buyGoldSellD,
   buyGoldSellDv2,
+  detectMACrossover,
 };
 
 function calculate(
