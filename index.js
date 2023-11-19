@@ -19,7 +19,7 @@ async function start(endTime = undefined) {
   // Intervals: 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M
   binance.candlesticks(
     PAIR,
-    "15m",
+    "1h",
     (error, ticks, symbol) => {
       if (!error) {
         subject.next(ticks);
@@ -34,7 +34,7 @@ async function start(endTime = undefined) {
         start(endTime);
       }
     },
-    { endTime }
+    { limit: 100 }
   );
 }
 subject.pipe(takeUntil(done$)).subscribe((newData) => {
@@ -45,7 +45,7 @@ subject.pipe(takeUntil(done$)).subscribe((newData) => {
     //lib.maCrossBB(data, period, 9, 25, 1, 0.035);
     //lib.buyGoldSellDv2(data, 12, 26, 5);
 
-    lib.detectMACrossover(
+    lib.trendlinesWithBreaks(
       data.map((item) => {
         const data = ([
           time,
@@ -75,9 +75,7 @@ subject.pipe(takeUntil(done$)).subscribe((newData) => {
           buyAssetVolume,
           ignored,
         };
-      }),
-      99,
-      25
+      })
     );
     done$.next(true);
     done$.unsubscribe();

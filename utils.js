@@ -1,4 +1,4 @@
-const { ema, sma, bollingerBands } = require("indicatorts");
+const { ema, sma, bollingerBands, rsi, williamsR } = require("indicatorts");
 function delay(ms) {
   return new Promise((res) => setTimeout(res, ms));
 }
@@ -536,7 +536,7 @@ function detectMACrossover(data, fastMA, slowMA) {
   const closes = data.map((t) => t.close).map(Number);
   const fastSMA = ema(fastMA, closes);
   const slowSMA = ema(slowMA, closes);
-
+  ticks = [...data];
   data.forEach((item, index) => {
     if (index > 2) {
       if (
@@ -545,23 +545,182 @@ function detectMACrossover(data, fastMA, slowMA) {
         fastSMA[index - 2] < slowSMA[index - 2]
       ) {
         console.log(
-          "Bullish crossover detected @" +
-            new Date(data[index].time).toUTCString()
+          `Bullish crossover detected RSI:${
+            rsi(
+              ticks.slice(index - 14, index).map((item) => Number(item.close))
+            )[13]
+          } @ ${new Date(data[index].time).toUTCString()}`
         );
-      }
-      else if (
+      } else if (
         fastSMA[index] < slowSMA[index] &&
         fastSMA[index - 1] > slowSMA[index - 1] &&
         fastSMA[index - 2] > slowSMA[index - 2]
       ) {
         console.log(
-          "Bearish crossover detected @" + new Date(data[index].time).toUTCString()
+          `Bearish crossover detected RSI:${
+            rsi(
+              ticks.slice(index - 14, index).map((item) => Number(item.close))
+            )[13]
+          } @ ${new Date(data[index].time).toUTCString()}`
         );
       }
     }
   });
 }
+
+function backtestMACrossover(data, fastMA, slowMA, hysteresis = 0.1) {
+  const closes = data.map((t) => parseFloat(t.close));
+  const fastSMA = ema(fastMA, closes);
+  const slowSMA = ema(slowMA, closes);
+  const ticks = [...data];
+
+  let inPosition = false; // Track if we are in a position
+  let entryPrice = 0; // Price at which we entered the position
+  let totalGainLoss = 0; // Track total gain/loss
+
+  data.forEach((item, index) => {
+    if (index >= Math.max(fastMA, slowMA)) {
+      const isGoldCross =
+        fastSMA[index] > slowSMA[index] &&
+        fastSMA[index - 1] <= slowSMA[index - 1];
+      const isDeathCross =
+        fastSMA[index] < slowSMA[index] &&
+        fastSMA[index - 1] >= slowSMA[index - 1];
+
+      if (
+        isGoldCross &&
+        !inPosition &&
+        fastSMA[index - 1] <= slowSMA[index - 1] * (1 + hysteresis)
+      ) {
+        // Entering a long position
+        entryPrice = parseFloat(item.close);
+        inPosition = true;
+        console.log(
+          `Gold Cross detected - Going Long @ ${new Date(
+            data[index].time
+          ).toUTCString()} - Entry Price: ${entryPrice}`
+        );
+      } else if (
+        isDeathCross &&
+        inPosition &&
+        fastSMA[index - 1] >= slowSMA[index - 1] * (1 - hysteresis)
+      ) {
+        // Exiting the long position
+        const exitPrice = parseFloat(item.close);
+        const gainLoss = exitPrice - entryPrice;
+        totalGainLoss += gainLoss;
+        inPosition = false;
+        console.log(
+          `Death Cross detected - Going Short @ ${new Date(
+            data[index].time
+          ).toUTCString()} - Exit Price: ${exitPrice} - Gain/Loss: ${gainLoss}`
+        );
+      }
+    }
+  });
+
+  // Print the total gain/loss at the end of the backtest
+  console.log(`Total Gain/Loss: ${totalGainLoss}`);
+}
+
+// JavaScript version of the Pine Script code
+function trendlinesWithBreaks(
+  data, // An array of price data objects (each with high, low, and close properties)
+  length = 14, // Length parameter
+  k = 1.0, // Slope parameter
+  method = "Atr", // Slope Calculation Method
+  show = false // Show Only Confirmed Breakouts
+) {
+  const results = {
+    upper: [],
+    lower: [],
+    upperBreakout: [],
+    lowerBreakout: [],
+    upLines: [],
+    downLines: [],
+    recentUpBreaks: [],
+    recentDownBreaks: [],
+  };
+
+  let slope_ph = 0;
+  let slope_pl = 0;
+  let upper = 0;
+  let lower = 0;
+  let single_upper = 0;
+  let single_lower = 0;
+  let ph, pl;
+  const src = data.map((item) => item.close); // Extract closing prices from data
+
+  for (let i = 0; i < data.length; i++) {
+    ph = i >= length ? pivotHigh(i, length, data) : 0;
+    pl = i >= length ? pivotLow(i, length, data) : 0;
+
+    let slope;
+    if (method === "Atr") {
+      slope = (atr(data, length) / length) * k; // Implement your ATR calculation function
+    } else if (method === "Stdev") {
+      slope = (calculateStdev(src, length) / length) * k; // Implement your standard deviation calculation function
+    } else if (method === "Linreg") {
+      slope = calculateLinreg(src, i, length, data) * k; // Implement your linear regression calculation function
+    }
+
+    slope_ph = ph ? slope : slope_ph;
+    slope_pl = pl ? slope : slope_pl;
+
+    upper = ph ? ph : upper - slope_ph;
+    lower = pl ? pl : lower + slope_pl;
+
+    single_upper = src[i - length] > upper ? 0 : ph ? 1 : single_upper;
+    single_lower = src[i - length] < lower ? 0 : pl ? 1 : single_lower;
+
+    results.upperBreakout.push(
+      single_upper === 1 &&
+        src[i] > upper &&
+        (show ? src[i] > src[i - length] : 1)
+    );
+    results.lowerBreakout.push(
+      single_lower === 1 &&
+        src[i] < lower &&
+        (show ? src[i] < src[i - length] : 1)
+    );
+
+    if (ph && i >= length - 1) {
+      results.upLines.push({ start: i - length, end: i, upper: upper });
+    }
+    if (pl && i >= length - 1) {
+      results.downLines.push({ start: i - length, end: i, lower: lower });
+    }
+
+    if (i >= length && src[i] > upper - slope_ph * length) {
+      results.recentUpBreaks.push({
+        barIndex: i,
+        price: src[i],
+        time: new Date(data[i].Time).toUTCString(),
+      });
+    }
+    if (i >= length && src[i] < lower + slope_pl * length) {
+      results.recentDownBreaks.push({
+        barIndex: i,
+        price: src[i],
+        time: new Date(data[i].time).toUTCString(),
+      });
+    }
+
+    results.upper.push(upper);
+    results.lower.push(lower);
+  }
+
+  console.log(results); // Output the results to the console for debugging
+  return results;
+}
+function fractial3Sma(data) {
+  data.forEach((item) => {
+    const { highs, lows, closings } = item;
+    const result = williamsR(highs, lows, closings);
+  });
+}
 module.exports = {
+  fractial3Sma,
   delay,
   volumeOscillator,
   backtestBBema95min,
@@ -570,6 +729,8 @@ module.exports = {
   buyGoldSellD,
   buyGoldSellDv2,
   detectMACrossover,
+  backtestMACrossover,
+  trendlinesWithBreaks,
 };
 
 function calculate(
@@ -602,6 +763,77 @@ function calculate(
   balance = newBalance;
   return { entred, positions, periods, realBalance, balance };
 }
+function atr(data, length) {
+  const atr = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < length) {
+      atr.push(null);
+      continue;
+    }
+
+    let trSum = 0;
+    for (let j = i; j > i - length; j--) {
+      const high = data[j].high;
+      const low = data[j].low;
+      const prevClose = j > 0 ? data[j - 1].close : data[j].open;
+      const trueRange = Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      );
+      trSum += trueRange;
+    }
+
+    atr.push(trSum / length);
+  }
+
+  return atr;
+}
+
+function pivotHigh(data, length) {
+  const pivotHighs = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < length) {
+      pivotHighs.push(null);
+      continue;
+    }
+
+    const high = data[i].high;
+    let isPivotHigh = true;
+    for (let j = i - 1; j >= i - length; j--) {
+      if (data[j].high >= high) {
+        isPivotHigh = false;
+        break;
+      }
+    }
+
+    pivotHighs.push(isPivotHigh ? high : null);
+  }
+  return pivotHighs;
+}
+
+function pivotLow(data, length) {
+  const pivotLows = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < length) {
+      pivotLows.push(null);
+      continue;
+    }
+
+    const low = data[i].low;
+    let isPivotLow = true;
+    for (let j = i - 1; j >= i - length; j--) {
+      if (data[j].low <= low) {
+        isPivotLow = false;
+        break;
+      }
+    }
+
+    pivotLows.push(isPivotLow ? low : null);
+  }
+  return pivotLows;
+}
+
 /**
  * https://github.com/jaggedsoft/node-binance-api
 
