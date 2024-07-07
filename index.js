@@ -6,10 +6,11 @@ const { Subject, takeUntil } = require("rxjs");
 data = [];
 count = 0;
 const binance = new Binance().options({
-  APIKEY: process.APIKEY,
-  APISECRET: process.APISECRET,
+  APIKEY: process.env.APIKEY,
+  APISECRET: process.env.APISECRET,
+  family: 4,
 });
-const PAIR = "BTCBUSD";
+const PAIR = "BTCUSDT";
 
 let subject = new Subject();
 done$ = new Subject();
@@ -19,7 +20,7 @@ async function start(endTime = undefined) {
   // Intervals: 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M
   binance.candlesticks(
     PAIR,
-    "1h",
+    "3m",
     (error, ticks, symbol) => {
       if (!error) {
         subject.next(ticks);
@@ -40,43 +41,9 @@ async function start(endTime = undefined) {
 subject.pipe(takeUntil(done$)).subscribe((newData) => {
   data = [...newData, ...data];
   let period = (new Date() - new Date(data[0][0])) / (1000 * 60 * 60 * 24);
-  console.log(period + "Days");
-  if (period > 1) {
-    //lib.maCrossBB(data, period, 9, 25, 1, 0.035);
-    //lib.buyGoldSellDv2(data, 12, 26, 5);
-
-    lib.trendlinesWithBreaks(
-      data.map((item) => {
-        const data = ([
-          time,
-          open,
-          high,
-          low,
-          close,
-          volume,
-          closeTime,
-          assetVolume,
-          trades,
-          buyBaseVolume,
-          buyAssetVolume,
-          ignored,
-        ] = item);
-        return {
-          time,
-          open,
-          high,
-          low,
-          close,
-          volume,
-          closeTime,
-          assetVolume,
-          trades,
-          buyBaseVolume,
-          buyAssetVolume,
-          ignored,
-        };
-      })
-    );
+  console.log(period + " Days");
+  if (period < 1) {
+    lib.superTrendEMA200(lib.convertStringToNumbers(data), 300);
     done$.next(true);
     done$.unsubscribe();
   }
