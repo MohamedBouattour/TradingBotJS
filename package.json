@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@ixjb94/indicators": "^1.2.2",
     "dotenv": "^16.0.0",
     "node-binance-api": "^0.13.1",
     "node-super-trend": "^1.5.0",
