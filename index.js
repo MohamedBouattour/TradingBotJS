@@ -20,7 +20,7 @@ async function start(endTime = undefined) {
   // Intervals: 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M
   binance.candlesticks(
     PAIR,
-    "30m",
+    "4h",
     (error, ticks, symbol) => {
       if (!error) {
         subject.next(ticks);
@@ -41,8 +41,8 @@ subject.pipe(takeUntil(done$)).subscribe((newData) => {
   data = [...newData, ...data];
   let period = (new Date() - new Date(data[0][0])) / (1000 * 60 * 60 * 24);
   console.log(period + " Days from " + new Date(data[0][0]).toISOString());
-  if (period > 30) {
-    lib.superTrendEMA50(lib.convertStringToNumbers(data), 220 * 3, 50);
+  if (period > 365) {
+    lib.superTrendEMA50(lib.convertStringToNumbers(data), 1000, 50);
     done$.next(true);
     done$.unsubscribe();
   }
