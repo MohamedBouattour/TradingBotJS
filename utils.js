@@ -102,15 +102,15 @@ function superTrendEMA50(data, amount = 100, emaPeriod = 50) {
 function superTrendEMAWithEMA200Cofirmation(
   data,
   amount = 100,
-  emaPeriod = 200
+  emaPeriod = 50
 ) {
   const eps = 0;
-  const targetROI = 0.8 / 100;
+  const targetROI = 1.2 / 100;
   let position = null;
   const sampleLength = 200;
   let pnl = amount;
-  const fees = 0.05;
-  let riskRewardRatio = 2.5 / 1;
+  const fees = 0;
+  let riskRewardRatio = 5 / 1;
   let losses = 0;
   let wins = 0;
   data?.forEach((candle, index) => {
@@ -127,26 +127,30 @@ function superTrendEMAWithEMA200Cofirmation(
         st[st.length - 1].trend === "long" &&
         price > ema50s[ema50s.length - 1] + eps
       ) {
+        const slPrice = st[st.length - 1].value;
+        const tpPrice = price * (1 + (price / slPrice - 1) * 2);
         position = {
           type: "Long",
           entryPrice: price,
-          targetPrice: price * (1 + targetROI),
-          slPrice: price * (1 - targetROI / 2),
+          targetPrice: tpPrice,
+          slPrice: slPrice,
           time: candle[0],
-          targetROI,
+          targetROI: tpPrice / price - 1,
         };
       } else if (
         st[st.length - 2].trend === "long" &&
         st[st.length - 1].trend === "short" &&
-        price > ema50s[ema50s.length - 1] + eps
+        price < ema50s[ema50s.length - 1] + eps
       ) {
+        const slPrice = ema50s[ema50s.length - 1];
+        tpPrice = price * (1 - (slPrice / price - 1) * 2);
         position = {
           type: "Short",
           entryPrice: price,
-          targetPrice: price * (1 - targetROI),
-          slPrice: price * (1 + targetROI / 2),
+          targetPrice: tpPrice,
+          slPrice: slPrice,
           time: candle[0],
-          targetROI,
+          targetROI: price / tpPrice - 1,
         };
       }
     }
@@ -194,6 +198,93 @@ function superTrendEMAWithEMA200Cofirmation(
     st[st.length - 1],
     ema50s[ema50s.length - 1]
   ); */
+}
+
+function superTrendMACD(data, amount = 100, emaPeriod = 50) {
+  const eps = 0;
+  const targetROI = 1.2 / 100;
+  let position = null;
+  const sampleLength = 200;
+  let pnl = amount;
+  const fees = 0;
+  let riskRewardRatio = 1.5;
+  let losses = 0;
+  let wins = 0;
+  data?.forEach((candle, index) => {
+    if (index > sampleLength && !position) {
+      const testedPeriodData = data.slice(0, index);
+      const st = new SuperTrend(testedPeriodData, 10, 3).calculate();
+      const macd = ta.macd(
+        testedPeriodData.map((t) => t[4]),
+        12,
+        26,
+        9
+      );
+      price = candle[1];
+      const slPrice = st[st.length - 1].value;
+      if (
+        st[st.length - 2].trend === "short" &&
+        st[st.length - 1].trend === "long" &&
+        0 > macd[macd.length - 1][macd.length - 1]
+      ) {
+        const tpPrice = price * (1 + (price / slPrice - 1) * riskRewardRatio);
+        position = {
+          type: "Long",
+          entryPrice: price,
+          targetPrice: tpPrice,
+          slPrice: slPrice,
+          time: candle[0],
+          targetROI: tpPrice / price - 1,
+        };
+      } else if (
+        st[st.length - 2].trend === "long" &&
+        st[st.length - 1].trend === "short" &&
+        0 < macd[macd.length - 1][macd.length - 1]
+      ) {
+        const tpPrice = price * (1 - (slPrice / price - 1) * riskRewardRatio);
+        position = {
+          type: "Short",
+          entryPrice: price,
+          targetPrice: tpPrice,
+          slPrice: slPrice,
+          time: candle[0],
+          targetROI: price / tpPrice - 1,
+        };
+      }
+    }
+    if (index > sampleLength && position) {
+      if (
+        (candle[2] > position.targetPrice && position.type == "Long") ||
+        (candle[3] < position.targetPrice && position.type == "Short")
+      ) {
+        wins++;
+        const RIO = position.targetROI;
+        pnl = pnl * (1 + RIO) * (1 - fees);
+        console.log(
+          `WIN ${position.type} ${position.time} ${position.entryPrice}->${position.targetPrice} #ROI ${RIO} % Balance : ${pnl}`
+        );
+        position = null;
+      } else if (
+        (candle[2] < position.slPrice && position.type == "Long") ||
+        (candle[3] > position.slPrice && position.type == "Short")
+      ) {
+        losses++;
+        pnl = pnl * (1 - position.targetROI / 2) * (1 - fees);
+        console.log(
+          `LOSS ${position.type} ${position.time} ${position.entryPrice}->${
+            position.slPrice
+          } #ROI ${position.targetROI / riskRewardRatio} % Balance : ${pnl}`
+        );
+        position = null;
+      }
+    }
+  });
+  console.log(position);
+  console.log(
+    `Total PNL = ${pnl - amount} | ${
+      100 + ((pnl - amount) / amount) * 100
+    }% Winrate ${(wins / (wins + losses)) * 100} %`
+  );
 }
 function delay(ms) {
   return new Promise((res) => setTimeout(res, ms));
@@ -248,12 +339,14 @@ function convertStringToNumbers(candles) {
     return candle;
   });
 }
+
 module.exports = {
   superTrendEMA50,
   delay,
   mapToObj,
   convertStringToNumbers,
   superTrendEMAWithEMA200Cofirmation,
+  superTrendMACD,
 };
 /**
  * https://github.com/jaggedsoft/node-binance-api
