@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@ixjb94/indicators": "^1.2.2",
+    "bybit-api": "^3.10.13",
     "dotenv": "^16.0.0",
     "node-binance-api": "^0.13.1",
     "node-super-trend": "^1.5.0",

@@ -287,14 +287,12 @@ function superTrendMACD(data, amount = 100, emaPeriod = 50) {
   );
 }
 
-function ruumMACD(data, amount = 100, emaPeriod = 9) {
-  const eps = 0;
-  const targetROI = 1.2 / 100;
+function ruumMACD(data, amount = 100, maPeriod = 25) {
   let position = null;
   const sampleLength = 50;
   let pnl = amount;
   const fees = 0;
-  let riskRewardRatio = 2;
+  let riskRewardRatio = 1.5;
   let losses = 0;
   let wins = 0;
   data?.forEach((candle, index) => {
@@ -306,15 +304,25 @@ function ruumMACD(data, amount = 100, emaPeriod = 9) {
         26,
         9
       );
+      const emas = ta.ema(
+        testedPeriodData.map((t) => t[4]),
+        maPeriod
+      );
       const channel = ta.dc(
         testedPeriodData.map((t) => t[2]),
         testedPeriodData.map((t) => t[3]),
         4
       );
-      const lower = channel[2][channel[2].length - 1];
-      const higher = channel[0][channel[0].length - 1];
+      /* const lower = channel[2][channel[2].length - 1];
+      const higher = channel[0][channel[0].length - 1]; */
+      const lower = data[index - 1][3];
+      const higher = data[index - 1][2];
       price = candle[1];
-      if (0 > macd[2][macd[2].length - 2] && 0 < macd[2][macd[2].length - 1]) {
+      if (
+        0 > macd[2][macd[2].length - 2] &&
+        0 < macd[2][macd[2].length - 1] &&
+        price > emas[emas.length - 1]
+      ) {
         const tpPrice = price * (1 + (price / lower - 1) * riskRewardRatio);
         position = {
           type: "Long",
@@ -326,7 +334,8 @@ function ruumMACD(data, amount = 100, emaPeriod = 9) {
         };
       } else if (
         0 < macd[2][macd[2].length - 2] &&
-        0 > macd[2][macd[2].length - 1]
+        0 > macd[2][macd[2].length - 1] &&
+        price < emas[emas.length - 1]
       ) {
         const tpPrice = price * (1 - (higher / price - 1) * riskRewardRatio);
         position = {
@@ -348,19 +357,27 @@ function ruumMACD(data, amount = 100, emaPeriod = 9) {
         const RIO = position.targetROI;
         pnl = pnl * (1 + RIO) * (1 - fees);
         console.log(
-          `WIN ${position.type} ${position.time} ${position.entryPrice}->${position.targetPrice} #ROI ${RIO} % Balance : ${pnl}`
+          `WIN ${position.type} ${position.time} ${position.entryPrice}->${
+            position.targetPrice
+          } #ROI ${RIO} % Balance : ${pnl} In: ${
+            (new Date(candle[0]) - new Date(position.time)) / (1000 * 60 * 60)
+          }`
         );
         position = null;
       } else if (
-        (candle[2] < position.slPrice && position.type == "Long") ||
-        (candle[3] > position.slPrice && position.type == "Short")
+        (candle[3] < position.slPrice && position.type == "Long") ||
+        (candle[2] > position.slPrice && position.type == "Short")
       ) {
         losses++;
         pnl = pnl * (1 - position.targetROI / 2) * (1 - fees);
         console.log(
           `LOSS ${position.type} ${position.time} ${position.entryPrice}->${
             position.slPrice
-          } #ROI ${position.targetROI / riskRewardRatio} % Balance : ${pnl}`
+          } #ROI ${
+            position.targetROI / riskRewardRatio
+          } % Balance : ${pnl} In: ${
+            (new Date(candle[0]) - new Date(position.time)) / (1000 * 60 * 60)
+          }`
         );
         position = null;
       }
@@ -368,9 +385,9 @@ function ruumMACD(data, amount = 100, emaPeriod = 9) {
   });
   console.log(position);
   console.log(
-    `Total Trades ${wins + losses} PNL = ${(pnl - amount).toFixed(2)} | ${(
-      100 +
-      ((pnl - amount) / amount) * 100
+    `Total Trades ${wins + losses} PNL = ${(pnl - amount).toFixed(2)} | +${(
+      ((pnl - amount) / amount) *
+      100
     ).toFixed(2)}% Winrate ${(wins / (wins + losses)) * 100} %`
   );
 }
@@ -412,13 +429,13 @@ function mapToObj(candles) {
 }
 function convertStringToNumbers(candles) {
   return candles.map((candle) => {
-    candle[0] = new Date(candle[0]).toISOString();
+    candle[0] = new Date(Number(candle[0])).toISOString();
     candle[1] = Number(candle[1]);
     candle[2] = Number(candle[2]);
     candle[3] = Number(candle[3]);
     candle[4] = Number(candle[4]);
     candle[5] = Number(candle[5]);
-    candle[6] = new Date(candle[6]).toISOString();
+    candle[6] = new Date(Number(candle[6])).toISOString();
     candle[7] = Number(candle[7]);
     candle[8] = Number(candle[8]);
     candle[9] = Number(candle[9]);
