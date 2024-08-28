@@ -2,11 +2,10 @@ const { RestClientV5 } = require("bybit-api");
 const { convertStringToNumbers } = require("./utils");
 require("dotenv").config();
 
-const API_URL = "https://api-testnet.bybit.com/v5/market";
 const time = 30;
 async function fetchCandles(
   client = new RestClientV5({
-    testnet: true,
+    testnet: false,
     key: process.env.API_KEY,
     secret: process.env.PRIVATE_KEY,
   })
@@ -37,18 +36,26 @@ async function fetchCandles(
       []
     );
     console.log(historicalData);
-    const positions = await client.getActiveOrders({
+    const openPositions = await client.getActiveOrders({
       category: "inverse",
       symbol: "BTCUSDT",
       openOnly: 0,
       limit: 1,
     });
-    console.log("Open Positions:", positions);
+    console.log("Open Positions:", openPositions.result);
+    const position = findOpportinity(historicalData);
+    if (position) {
+      //call api to open position
+    }
   } catch (error) {
     console.error(error);
   }
 }
 
-setInterval(() => {
+function findOpportinity(historicalData) {}
+
+fetchCandles();
+
+/* setInterval(() => {
   fetchCandles();
-}, time * 60 * 1000);
+}, time * 60 * 1000); */
